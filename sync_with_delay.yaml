@@ -1,6 +1,7 @@
+# sync_turn_off_delay_noloop.yaml
 blueprint:
-  name: "Обогреватель + Свет (без цикла)"
-  description: "Безопасная синхронизация: свет — индикатор работы обогревателя"
+  name: "Выключить с задержкой (без цикла)"
+  description: "Проверяет текущее состояние перед действием"
   domain: automation
   author: "Helper"
   input:
@@ -20,14 +21,15 @@ blueprint:
       name: "💡 Целевое устройство"
       selector:
         entity:
-    action_state:
-      name: "⚙️ Целевое состояние"
-      default: "off"
+    delay_seconds:
+      name: "⏱️ Задержка (секунды)"
+      default: 0
       selector:
-        select:
-          options:
-            - "on"
-            - "off"
+        number:
+          min: 0
+          max: 3600
+          step: 1
+          unit_of_measurement: "сек"
 
 trigger:
   - platform: state
@@ -35,15 +37,17 @@ trigger:
     to: !input trigger_state
 
 condition:
-  # 🔹 ГЛАВНОЕ: Не выполнять, если устройство уже в нужном состоянии
+  # 🔹 Не выполнять, если целевое устройство уже в нужном состоянии
   - condition: template
     value_template: >-
-      {{ states(input('target_entity')) != input('action_state') }}
+      {% set target = input('target_entity') %}
+      {% set trigger_state = input('trigger_state') %}
+      {{ states(target) != trigger_state }}
 
 action:
-  - service: >-
-      {% set domain = states(input('target_entity')).domain %}
-      {{ domain }}.turn_{{ input('action_state') }}
+  - delay:
+      seconds: !input delay_seconds
+  - service: homeassistant.turn_off
     target:
       entity_id: !input target_entity
 
