@@ -1,0 +1,54 @@
+blueprint:
+  name: "Простая синхронизация состояний"
+  description: "При изменении состояния одного устройства — меняет состояние другого"
+  domain: automation
+  author: "Ваше имя"
+  input:
+    trigger_entity:
+      name: "Устройство-триггер"
+      description: "При изменении состояния этого устройства сработает автоматизация"
+      selector:
+        entity:
+          multiple: false
+    trigger_state:
+      name: "Целевое состояние триггера"
+      description: "При переходе в это состояние (on/off/unavailable) запустится действие"
+      default: "off"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "unavailable"
+            - "unknown"
+    action_entity:
+      name: "Устройство-исполнитель"
+      description: "Это устройство изменит своё состояние"
+      selector:
+        entity:
+          multiple: false
+    action_service:
+      name: "Действие"
+      description: "Что сделать с устройством-исполнителем"
+      default: "turn_off"
+      selector:
+        select:
+          options:
+            - "turn_on"
+            - "turn_off"
+            - "toggle"
+
+trigger:
+  - platform: state
+    entity_id: !input trigger_entity
+    to: !input trigger_state
+
+condition: []
+
+action:
+  - service: >-
+      {{ states(!input action_entity).domain }}.!input action_service
+    target:
+      entity_id: !input action_entity
+
+mode: single
