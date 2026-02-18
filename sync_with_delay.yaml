@@ -1,69 +1,51 @@
 blueprint:
-  name: "Обогреватель + Свет (v2)"
-  description: "Безопасная синхронизация без зацикливания"
+  name: "Обогреватель + Свет (без цикла)"
+  description: "Безопасная синхронизация: свет — индикатор работы обогревателя"
   domain: automation
   author: "Helper"
   input:
-    heater_entity:
-      name: "🔥 Обогреватель (Коврик)"
+    trigger_entity:
+      name: "🔘 Устройство-триггер"
       selector:
         entity:
-          domain: [switch, plug]
-    light_entity:
-      name: "💡 Свет (Лоджия)"
-      selector:
-        entity:
-          domain: [light]
-    direction:
-      name: "🔄 Направление"
-      description: "Какая логика нужна"
+    trigger_state:
+      name: "🎯 Состояние триггера"
+      default: "off"
       selector:
         select:
           options:
-            - label: "Обогреватель → Свет"
-              value: "heater_to_light"
-            - label: "Свет → Обогреватель"
-              value: "light_to_heater"
+            - "on"
+            - "off"
+    target_entity:
+      name: "💡 Целевое устройство"
+      selector:
+        entity:
+    action_state:
+      name: "⚙️ Целевое состояние"
+      default: "off"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
 
 trigger:
   - platform: state
-    entity_id: !input heater_entity
-    to: "on"
-  - platform: state
-    entity_id: !input heater_entity
-    to: "off"
-  - platform: state
-    entity_id: !input light_entity
-    to: "off"
+    entity_id: !input trigger_entity
+    to: !input trigger_state
 
 condition:
-  # 🔹 Защита от цикла: не действовать, если уже в нужном состоянии
+  # 🔹 ГЛАВНОЕ: Не выполнять, если устройство уже в нужном состоянии
   - condition: template
     value_template: >-
-      {% set heater = input('heater_entity') %}
-      {% set light = input('light_entity') %}
-      {% set direction = input('direction') %}
-      {% if direction == 'heater_to_light' %}
-        {{ states(light) != states(heater) }}
-      {% else %}
-        {{ trigger.entity_id == light and states(heater) != 'off' }}
-      {% endif %}
+      {{ states(input('target_entity')) != input('action_state') }}
 
 action:
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: >-
-              {{ input('direction') == 'heater_to_light' }}
-        sequence:
-          - service: >-
-              {{ 'homeassistant.turn_on' if trigger.to_state.state == 'on' else 'homeassistant.turn_off' }}
-            target:
-              entity_id: !input light_entity
-    default:
-      - service: homeassistant.turn_off
-        target:
-          entity_id: !input heater_entity
+  - service: >-
+      {% set domain = states(input('target_entity')).domain %}
+      {{ domain }}.turn_{{ input('action_state') }}
+    target:
+      entity_id: !input target_entity
 
 #mode: single
 mode: restart
