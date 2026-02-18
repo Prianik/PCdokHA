@@ -1,5 +1,5 @@
 blueprint:
-  name: "Синхронизация с задержкой (v3 Optimized)"
+  name: "Синхронизация с задержкой"
   description: "При изменении состояния триггера — через заданное время меняет состояние целевого устройства"
   domain: automation
   author: "Helper"
@@ -18,6 +18,7 @@ blueprint:
           options:
             - "on"
             - "off"
+            - "unavailable"
     target_entity:
       name: "💡 Целевое устройство"
       description: "Это устройство изменит своё состояние"
@@ -45,39 +46,16 @@ blueprint:
           max: 3600
           step: 1
           unit_of_measurement: "сек"
-    skip_if_same:
-      name: "⏭️ Пропускать если уже в нужном состоянии"
-      description: "Не выполнять действие если устройство уже в целевом состоянии"
-      default: true
-      selector:
-        boolean:
 
 trigger:
   - platform: state
     entity_id: !input trigger_entity
     to: !input trigger_state
 
-condition:
-  # 🔹 Проверка: не пропускать ли если состояние уже совпадает
-  - condition: template
-    value_template: >-
-      {% set skip = input('skip_if_same') %}
-      {% set target = input('target_entity') %}
-      {% set action = input('action_type') %}
-      {% if not skip %}
-        true
-      {% elif action == 'toggle' %}
-        true
-      {% elif action == 'turn_on' %}
-        {{ states(target) != 'on' }}
-      {% elif action == 'turn_off' %}
-        {{ states(target) != 'off' }}
-      {% else %}
-        true
-      {% endif %}
+condition: []
 
 action:
-  # 🔹 Задержка (только если > 0)
+  # 🔹 Сначала задержка (если больше 0 секунд)
   - choose:
       - conditions:
           - condition: template
@@ -87,7 +65,7 @@ action:
               seconds: !input delay_seconds
     default: []
 
-  # 🔹 Действие (исправленный template)
+  # 🔹 Затем действие
   - choose:
       - conditions:
           - condition: template
@@ -108,4 +86,5 @@ action:
         target:
           entity_id: !input target_entity
 
+#mode: single
 mode: restart
