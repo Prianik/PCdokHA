@@ -1,0 +1,89 @@
+blueprint:
+  name: "Синхронизация с задержкой"
+  description: "При изменении состояния триггера — через заданное время меняет состояние целевого устройства"
+  domain: automation
+  author: "Helper"
+  input:
+    trigger_entity:
+      name: "🔘 Устройство-триггер"
+      description: "При изменении состояния этого устройства запустится таймер"
+      selector:
+        entity:
+    trigger_state:
+      name: "🎯 Состояние триггера"
+      description: "При переходе в это состояние сработает автоматизация"
+      default: "off"
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+            - "unavailable"
+    target_entity:
+      name: "💡 Целевое устройство"
+      description: "Это устройство изменит своё состояние"
+      selector:
+        entity:
+    action_type:
+      name: "⚙️ Действие"
+      default: "turn_off"
+      selector:
+        select:
+          options:
+            - label: "Включить"
+              value: "turn_on"
+            - label: "Выключить"
+              value: "turn_off"
+            - label: "Переключить"
+              value: "toggle"
+    delay_seconds:
+      name: "⏱️ Задержка (секунды)"
+      description: "Пауза перед выполнением действия (0 = без задержки)"
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 3600
+          step: 1
+          unit_of_measurement: "сек"
+
+trigger:
+  - platform: state
+    entity_id: !input trigger_entity
+    to: !input trigger_state
+
+condition: []
+
+action:
+  # 🔹 Сначала задержка (если больше 0 секунд)
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ input('delay_seconds') | int > 0 }}"
+        sequence:
+          - delay:
+              seconds: !input delay_seconds
+    default: []
+
+  # 🔹 Затем действие
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ input('action_type') == 'turn_on' }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input target_entity
+      - conditions:
+          - condition: template
+            value_template: "{{ input('action_type') == 'turn_off' }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input target_entity
+    default:
+      - service: homeassistant.toggle
+        target:
+          entity_id: !input target_entity
+
+mode: single
