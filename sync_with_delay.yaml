@@ -1,81 +1,69 @@
 blueprint:
-  name: "Синхронизация с задержкой (FIX)"
-  description: "При изменении состояния триггера — через заданное время меняет состояние целевого устройства"
+  name: "Обогреватель + Свет (v2)"
+  description: "Безопасная синхронизация без зацикливания"
   domain: automation
   author: "Helper"
   input:
-    trigger_entity:
-      name: "🔘 Устройство-триггер"
-      description: "При изменении состояния этого устройства запустится таймер"
+    heater_entity:
+      name: "🔥 Обогреватель (Коврик)"
       selector:
         entity:
-    trigger_state:
-      name: "🎯 Состояние триггера"
-      description: "При переходе в это состояние сработает автоматизация"
-      default: "off"
+          domain: [switch, plug]
+    light_entity:
+      name: "💡 Свет (Лоджия)"
+      selector:
+        entity:
+          domain: [light]
+    direction:
+      name: "🔄 Направление"
+      description: "Какая логика нужна"
       selector:
         select:
           options:
-            - "on"
-            - "off"
-    target_entity:
-      name: "💡 Целевое устройство"
-      description: "Это устройство изменит своё состояние"
-      selector:
-        entity:
-    action_type:
-      name: "⚙️ Действие"
-      default: "turn_off"
-      selector:
-        select:
-          options:
-            - label: "Включить"
-              value: "turn_on"
-            - label: "Выключить"
-              value: "turn_off"
-            - label: "Переключить"
-              value: "toggle"
-    delay_seconds:
-      name: "⏱️ Задержка (секунды)"
-      description: "Пауза перед выполнением действия (0 = без задержки)"
-      default: 0
-      selector:
-        number:
-          min: 0
-          max: 3600
-          step: 1
-          unit_of_measurement: "сек"
+            - label: "Обогреватель → Свет"
+              value: "heater_to_light"
+            - label: "Свет → Обогреватель"
+              value: "light_to_heater"
 
 trigger:
   - platform: state
-    entity_id: !input trigger_entity
-    to: !input trigger_state
+    entity_id: !input heater_entity
+    to: "on"
+  - platform: state
+    entity_id: !input heater_entity
+    to: "off"
+  - platform: state
+    entity_id: !input light_entity
+    to: "off"
 
-condition: []
+condition:
+  # 🔹 Защита от цикла: не действовать, если уже в нужном состоянии
+  - condition: template
+    value_template: >-
+      {% set heater = input('heater_entity') %}
+      {% set light = input('light_entity') %}
+      {% set direction = input('direction') %}
+      {% if direction == 'heater_to_light' %}
+        {{ states(light) != states(heater) }}
+      {% else %}
+        {{ trigger.entity_id == light and states(heater) != 'off' }}
+      {% endif %}
 
 action:
-  # 🔹 Задержка (работает напрямую с !input)
-  - delay:
-      seconds: !input delay_seconds
-
-  # 🔹 Действие
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ states('input.action_type') == 'turn_on' }}"
+            value_template: >-
+              {{ input('direction') == 'heater_to_light' }}
         sequence:
-          - service: homeassistant.turn_on
+          - service: >-
+              {{ 'homeassistant.turn_on' if trigger.to_state.state == 'on' else 'homeassistant.turn_off' }}
             target:
-              entity_id: !input target_entity
-      - conditions:
-          - condition: template
-            value_template: "{{ states('input.action_type') == 'turn_off' }}"
-        sequence:
-          - service: homeassistant.turn_off
-            target:
-              entity_id: !input target_entity
+              entity_id: !input light_entity
     default:
-      - service: homeassistant.toggle
+      - service: homeassistant.turn_off
         target:
-          entity_id: !input target_entity
+          entity_id: !input heater_entity
+
+#mode: single
 mode: restart
