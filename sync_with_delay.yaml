@@ -86,4 +86,4 @@ action:
         target:
           entity_id: !input target_entity
 
-mode: single
+mode: restart
