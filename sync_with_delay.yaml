@@ -1,16 +1,17 @@
-# sync_turn_off_delay_noloop.yaml
 blueprint:
-  name: "Выключить с задержкой (без цикла)"
-  description: "Проверяет текущее состояние перед действием"
+  name: "Синхронизация с задержкой (FIX)"
+  description: "При изменении состояния триггера — через заданное время меняет состояние целевого устройства"
   domain: automation
   author: "Helper"
   input:
     trigger_entity:
       name: "🔘 Устройство-триггер"
+      description: "При изменении состояния этого устройства запустится таймер"
       selector:
         entity:
     trigger_state:
       name: "🎯 Состояние триггера"
+      description: "При переходе в это состояние сработает автоматизация"
       default: "off"
       selector:
         select:
@@ -19,10 +20,24 @@ blueprint:
             - "off"
     target_entity:
       name: "💡 Целевое устройство"
+      description: "Это устройство изменит своё состояние"
       selector:
         entity:
+    action_type:
+      name: "⚙️ Действие"
+      default: "turn_off"
+      selector:
+        select:
+          options:
+            - label: "Включить"
+              value: "turn_on"
+            - label: "Выключить"
+              value: "turn_off"
+            - label: "Переключить"
+              value: "toggle"
     delay_seconds:
       name: "⏱️ Задержка (секунды)"
+      description: "Пауза перед выполнением действия (0 = без задержки)"
       default: 0
       selector:
         number:
@@ -36,20 +51,33 @@ trigger:
     entity_id: !input trigger_entity
     to: !input trigger_state
 
-condition:
-  # 🔹 Не выполнять, если целевое устройство уже в нужном состоянии
-  - condition: template
-    value_template: >-
-      {% set target = input('target_entity') %}
-      {% set trigger_state = input('trigger_state') %}
-      {{ states(target) != trigger_state }}
+condition: []
 
 action:
+  # 🔹 Задержка (работает напрямую с !input)
   - delay:
       seconds: !input delay_seconds
-  - service: homeassistant.turn_off
-    target:
-      entity_id: !input target_entity
 
-#mode: single
+  # 🔹 Действие
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ states('input.action_type') == 'turn_on' }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input target_entity
+      - conditions:
+          - condition: template
+            value_template: "{{ states('input.action_type') == 'turn_off' }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input target_entity
+    default:
+      - service: homeassistant.toggle
+        target:
+          entity_id: !input target_entity
+
+#mode: singlee
 mode: restart
